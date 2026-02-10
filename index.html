@@ -5,202 +5,208 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Headline Odds — Waitlist</title>
     <style>
-      :root {
-        color-scheme: dark;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Space Grotesk", "Satoshi", "Geist", "Avenir Next",
-          "Helvetica Neue", sans-serif;
-        background: radial-gradient(
-          120% 120% at 0% 0%,
-          #1c1f1d 0%,
-          #101211 48%,
-          #0b0d0c 100%
-        );
-        color: #f5f6f5;
-      }
-      .page {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 36px 20px;
-        position: relative;
-        overflow: hidden;
-      }
-      .glow {
-        position: absolute;
-        inset: auto;
-        width: 540px;
-        height: 540px;
-        border-radius: 999px;
-        background: radial-gradient(
-          circle,
-          rgba(0, 198, 94, 0.2),
-          rgba(0, 198, 94, 0)
-        );
-        filter: blur(10px);
-        top: -220px;
-        right: -160px;
-      }
-      .grid {
-        position: absolute;
-        inset: 0;
-        background-image: linear-gradient(
-            rgba(255, 255, 255, 0.04) 1px,
-            transparent 1px
-          ),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-        background-size: 44px 44px;
-        opacity: 0.35;
-        pointer-events: none;
-      }
-      .shell {
-        width: min(1080px, 100%);
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 28px;
-        position: relative;
-        z-index: 1;
-      }
-      .hero {
-        padding: 10px 6px;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-      }
-      .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 900;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        font-size: 12px;
-        color: #72f2b0;
-      }
-      .brand img {
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
-        filter: drop-shadow(0 4px 12px rgba(0, 198, 94, 0.35));
-      }
-      h1 {
-        margin: 0;
-        font-size: clamp(30px, 4vw, 44px);
-        line-height: 1.08;
-        letter-spacing: -0.02em;
-      }
-      .accent {
-        color: #00e38f;
-      }
-      .sub {
-        margin: 0;
-        color: #c5cec9;
-        font-size: 16px;
-        line-height: 1.6;
-      }
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .pill {
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: 1px solid rgba(0, 198, 94, 0.25);
-        background: rgba(0, 198, 94, 0.08);
-        font-size: 12px;
-        font-weight: 600;
-        color: #dfffe8;
-      }
-      .card {
-        border-radius: 18px;
-        padding: 22px;
-        background: linear-gradient(
-          140deg,
-          rgba(255, 255, 255, 0.08),
-          rgba(255, 255, 255, 0.02)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-        backdrop-filter: blur(10px);
-      }
-      .card h2 {
-        margin: 0 0 10px;
-        font-size: 20px;
-      }
-      .card p {
-        margin: 0 0 20px;
-        color: #c5cec9;
-        font-size: 14px;
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .input {
-        width: 100%;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(8, 10, 9, 0.6);
-        color: #f5f6f5;
-        font-size: 14px;
-        outline: none;
-      }
-      .input:focus {
-        border-color: rgba(0, 198, 94, 0.6);
-        box-shadow: 0 0 0 3px rgba(0, 198, 94, 0.2);
-      }
-      .button {
-        margin-top: 6px;
-        width: 100%;
-        padding: 12px 16px;
-        border-radius: 999px;
-        border: none;
-        background: linear-gradient(135deg, #00e38f, #00c65e);
-        color: #0b1410;
-        font-weight: 700;
-        font-size: 14px;
-        cursor: pointer;
-        transition: transform 150ms ease, box-shadow 150ms ease;
-        box-shadow: 0 10px 20px rgba(0, 198, 94, 0.35);
-      }
-      .button:hover {
-        transform: translateY(-1px);
-      }
-      .fine {
-        margin-top: 14px;
-        color: #8f9994;
-        font-size: 11px;
-        line-height: 1.5;
-      }
-      .success {
-        display: none;
-        margin-top: 12px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(0, 198, 94, 0.4);
-        background: rgba(0, 198, 94, 0.12);
-        color: #dfffe8;
-        font-size: 13px;
-      }
-      .success.show {
-        display: block;
-      }
-      @media (max-width: 720px) {
-        .card {
-          padding: 18px;
-        }
-      }
-    </style>
+  :root {
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Space Grotesk", "Satoshi", "Geist", "Avenir Next",
+      "Helvetica Neue", sans-serif;
+    background: radial-gradient(
+      120% 120% at 0% 0%,
+      #1c1f1d 0%,
+      #101211 48%,
+      #0b0d0c 100%
+    );
+    color: #f5f6f5;
+  }
+  .page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .glow {
+    position: absolute;
+    inset: auto;
+    width: 540px;
+    height: 540px;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle,
+      rgba(0, 198, 94, 0.2),
+      rgba(0, 198, 94, 0)
+    );
+    filter: blur(10px);
+    top: -220px;
+    right: -160px;
+  }
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+        rgba(255, 255, 255, 0.04) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 44px 44px;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .shell {
+    width: min(980px, 100%);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .hero {
+    padding: 6px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 520px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: #72f2b0;
+  }
+  .brand img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0, 198, 94, 0.35));
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(30px, 4.6vw, 44px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .accent {
+    color: #00e38f;
+  }
+  .sub {
+    margin: 0;
+    color: #c5cec9;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .card {
+    border-radius: 18px;
+    padding: 20px;
+    background: linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.02)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(10px);
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+  }
+  .card p {
+    margin: 0 0 18px;
+    color: #c5cec9;
+    font-size: 14px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(8, 10, 9, 0.6);
+    color: #f5f6f5;
+    font-size: 14px;
+    outline: none;
+  }
+  .input:focus {
+    border-color: rgba(0, 198, 94, 0.6);
+    box-shadow: 0 0 0 3px rgba(0, 198, 94, 0.2);
+  }
+  .button {
+    margin-top: 6px;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(135deg, #00e38f, #00c65e);
+    color: #0b1410;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    box-shadow: 0 10px 20px rgba(0, 198, 94, 0.35);
+  }
+  .button:hover {
+    transform: translateY(-1px);
+  }
+  .fine {
+    margin-top: 12px;
+    color: #8f9994;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .success {
+    display: none;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 198, 94, 0.4);
+    background: rgba(0, 198, 94, 0.12);
+    color: #dfffe8;
+    font-size: 13px;
+  }
+  .success.show {
+    display: block;
+  }
+
+  /* Mobile tighten */
+  @media (max-width: 820px) {
+    .shell {
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    .hero {
+      max-width: 100%;
+      gap: 12px;
+    }
+    h1 {
+      font-size: 32px;
+      line-height: 1.08;
+    }
+    .sub {
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .card {
+      padding: 18px;
+    }
+  }
+</style>
   </head>
   <body>
     <div class="page">
@@ -212,14 +218,15 @@
             <img src="logo.png" alt="Headline Odds" />
             Headline Odds
           </div>
-          <h1>
-           Real-time Market <span class="accent">probabilities</span><br />
-          in the news you already read.
-          </h1>
+          <h1 class="hero-title">
+  Real-time Market <span class="accent">probabilities</span>
+  in the news you already read.
+</h1>
           <p class="sub">
-            Join the waitlist for a premium experience that turns headlines into
-            live market odds — focused, and beautifully minimal.
+            Join the waitlist for a premium overlay that turns headlines into
+            live market odds — fast, focused, and beautifully minimal.
           </p>
+    
         <div class="card">
           <h2>Get early access</h2>
           <p>Be the first to try Headline Odds. We’ll only email for launch.</p>
@@ -241,7 +248,7 @@
           </div>
 
           <p class="fine">
-            You agree to receive product updates. No spam, ever.
+            By joining, you agree to receive product updates. No spam, ever.
           </p>
         </div>
       </div>
@@ -275,4 +282,3 @@
     </script>
   </body>
 </html>
-
