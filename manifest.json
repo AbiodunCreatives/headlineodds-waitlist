@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Kalshi Market Odds",
+  "name": "Headline Odds",
   "version": "1.0.0",
   "description": "Shows real-time Kalshi prediction market odds next to news headlines",
   "permissions": ["storage"],
