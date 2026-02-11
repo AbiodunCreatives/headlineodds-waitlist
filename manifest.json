@@ -14,23 +14,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.cnn.com/*",
-        "https://*.bbc.com/*",
-        "https://*.nytimes.com/*",
-        "https://*.foxnews.com/*",
-        "https://*.reuters.com/*",
-        "https://*.apnews.com/*",
-        "https://*.washingtonpost.com/*",
-        "https://*.theguardian.com/*",
-        "https://*.bloomberg.com/*",
-        "https://*.cnbc.com/*",
-        "https://*.wsj.com/*",
-        "https://*.politico.com/*",
-        "https://*.axios.com/*",
-        "https://*.nbcnews.com/*",
-        "https://*.abcnews.go.com/*",
-        "https://news.google.com/*",
-        "https://news.ycombinator.com/*"
+        "https://*/*",
+        "http://*/*"
       ],
       "js": ["content.js"],
       "css": ["style.css"],
