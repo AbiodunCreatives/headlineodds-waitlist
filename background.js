@@ -193,7 +193,7 @@ function findMatches(headline, markets) {
     volume: s.market.volume,
     open_interest: s.market.open_interest,
     close_time: s.market.close_time,
-    url: `https://kalshi.com/markets/${s.market.ticker}`,
+    url: `https://kalshi.com/markets/${(s.market.ticker || "").toLowerCase()}`,
     score: s.score,
   }));
 }
