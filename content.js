@@ -77,6 +77,8 @@
 
     pill.innerHTML = `<span class="kalshi-pill-icon"></span><span class="kalshi-pill-text">Market odds</span>`;
     pill.title = "View Kalshi market odds";
+    pill._marketData = data;
+    pill._card = null; // force rebuild if data changed
     pill.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -85,6 +87,11 @@
   }
 
   function toggleCard(pill, marketData, headline) {
+    const data = pill._marketData || marketData;
+    if (!data || !data.length) return;
+
+    const card = pill._card || (pill._card = buildCard(pill, data, headline));
+
     if (activeCard) {
       activeCard.remove();
       if (activeCard._pill === pill) {
@@ -94,6 +101,33 @@
       activeCard = null;
     }
 
+    // Position card directly under pill
+    const rect = pill.getBoundingClientRect();
+    card.style.position = "fixed";
+    card.style.zIndex = "2147483647";
+    document.body.appendChild(card);
+
+    const cardRect = card.getBoundingClientRect();
+    let top = rect.bottom + 6;
+    let left = rect.left;
+
+    if (top + cardRect.height > window.innerHeight) {
+      top = rect.top - cardRect.height - 6;
+    }
+    if (left + cardRect.width > window.innerWidth) {
+      left = window.innerWidth - cardRect.width - 10;
+    }
+    if (left < 6) left = 6;
+
+    card.style.top = `${top}px`;
+    card.style.left = `${left}px`;
+
+    makeDraggable(card, card.querySelector(".kalshi-card-header"));
+
+    activeCard = card;
+  }
+
+  function buildCard(pill, marketData, headline) {
     const card = document.createElement("div");
     card.className = "kalshi-market-card";
     card._pill = pill;
@@ -113,7 +147,7 @@
         <span class="kalshi-card-index"></span>
         <button class="kalshi-nav-btn kalshi-nav-next" aria-label="Next market">›</button>
       </div>` : ""}
-      <a class="kalshi-cta" href="${marketData[0].url}" target="_blank" rel="noopener">View market</a>
+      <a class="kalshi-cta" href="${normalizeKalshiUrl(marketData[0].url, marketData[0].ticker)}" target="_blank" rel="noopener">View market</a>
       <div class="kalshi-powered">Powered by <span>Kalshi</span></div>
     `;
     // defensive: ensure no pills render inside card
@@ -197,31 +231,7 @@
     }
 
     renderMarket(current);
-
-    // Position card directly under pill
-    const rect = pill.getBoundingClientRect();
-    card.style.position = "fixed";
-    card.style.zIndex = "2147483647";
-    document.body.appendChild(card);
-
-    const cardRect = card.getBoundingClientRect();
-    let top = rect.bottom + 6;
-    let left = rect.left;
-
-    if (top + cardRect.height > window.innerHeight) {
-      top = rect.top - cardRect.height - 6;
-    }
-    if (left + cardRect.width > window.innerWidth) {
-      left = window.innerWidth - cardRect.width - 10;
-    }
-    if (left < 6) left = 6;
-
-    card.style.top = `${top}px`;
-    card.style.left = `${left}px`;
-
-    makeDraggable(card, card.querySelector(".kalshi-card-header"));
-
-    activeCard = card;
+    return card;
   }
 
   function makeDraggable(el, handle) {
