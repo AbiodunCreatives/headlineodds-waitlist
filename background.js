@@ -82,6 +82,7 @@ async function getAllMarkets() {
             volume: m.volume,
             open_interest: m.open_interest,
             close_time: close,
+            market_url: m.market_url || m.url || m.public_url || m.url_slug,
           });
         }
       }
@@ -193,7 +194,9 @@ function findMatches(headline, markets) {
     volume: s.market.volume,
     open_interest: s.market.open_interest,
     close_time: s.market.close_time,
-    url: `https://kalshi.com/markets/${s.market.ticker || ""}`,
+    url:
+      s.market.market_url ||
+      (s.market.ticker ? `https://kalshi.com/markets/${s.market.ticker}` : ""),
     score: s.score,
   }));
 }
