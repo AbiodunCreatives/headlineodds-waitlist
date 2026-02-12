@@ -142,17 +142,19 @@
         ? new Date(m.close_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "—";
 
+      const targetUrl = normalizeKalshiUrl(m.url, m.ticker);
+
       cardBody.innerHTML = `
         <div class="kalshi-market-item">
           <div class="kalshi-market-title">${escapeHtml(m.title)}</div>
           ${m.subtitle ? `<div class="kalshi-market-subtitle">${escapeHtml(m.subtitle)}</div>` : ""}
           <div class="kalshi-market-odds list">
-            <a class="kalshi-odd kalshi-yes" href="${m.url}" target="_blank" rel="noopener">
+            <a class="kalshi-odd kalshi-yes" href="${targetUrl}" target="_blank" rel="noopener">
               <span class="kalshi-odd-label">Yes</span>
               <span class="kalshi-odd-multiplier">${m.yes_bid && m.no_bid ? `${(100 / m.yes_bid).toFixed(2)}x` : ""}</span>
               <span class="kalshi-odd-value">${yesPct}</span>
             </a>
-            <a class="kalshi-odd kalshi-no" href="${m.url}" target="_blank" rel="noopener">
+            <a class="kalshi-odd kalshi-no" href="${targetUrl}" target="_blank" rel="noopener">
               <span class="kalshi-odd-label">No</span>
               <span class="kalshi-odd-multiplier">${m.no_bid && m.yes_bid ? `${(100 / m.no_bid).toFixed(2)}x` : ""}</span>
               <span class="kalshi-odd-value">${noPct}</span>
@@ -162,12 +164,12 @@
             <span>Vol: ${vol}</span>
             <span>Closes: ${closeDate}</span>
           </div>
-          <a class="kalshi-market-link" href="${m.url}" target="_blank" rel="noopener">Trade on Kalshi →</a>
+          <a class="kalshi-market-link" href="${targetUrl}" target="_blank" rel="noopener">Trade on Kalshi →</a>
         </div>
       `;
 
       const cta = card.querySelector(".kalshi-cta");
-      if (cta) cta.href = m.url;
+      if (cta) cta.href = targetUrl;
       if (indexEl) indexEl.textContent = `${idx + 1}/${marketData.length}`;
       if (prevBtn) prevBtn.disabled = idx === 0;
       if (nextBtn) nextBtn.disabled = idx === marketData.length - 1;
@@ -313,3 +315,11 @@
   });
   observer.observe(document.body, { childList: true, subtree: true });
 })();
+
+// Normalize a Kalshi market URL defensively (used by content and background responses)
+function normalizeKalshiUrl(url, ticker) {
+  if (url && url.startsWith("http")) return url;
+  if (url && url.startsWith("/")) return `https://kalshi.com${url}`;
+  if (ticker) return `https://kalshi.com/markets/${ticker}`;
+  return "https://kalshi.com/markets";
+}
