@@ -409,12 +409,12 @@
   margin-left: 8px;
   font-size: 11px;
   font-weight: 800;
-  color: #0f140f;
-  background: #00c65e;
+  color: #0d140f;
+  background: #00b86b;
   border-radius: 999px;
-  border: 1px solid #00e38f;
+  border: 1px solid #00d48a;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 198, 94, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 184, 107, 0.2);
   line-height: 1.2;
   vertical-align: middle;
 }
