@@ -23,9 +23,12 @@
   const processedElements = new WeakSet();
   const headlinePills = new Map(); // headline -> pill
   const headlineMarkets = new Map(); // headline -> last good markets
+  const headlineHosts = new Map(); // headline -> host element
+  let lastLogTs = 0;
   let activeCard = null;
   const LOGO_URL = chrome.runtime.getURL("logo.png");
-  const FALLBACK_LOGO_URL = chrome.runtime.getURL("icons/icon16.png");
+  // Use root icon because only root icons are web-accessible; avoids 404 on fallback
+  const FALLBACK_LOGO_URL = chrome.runtime.getURL("icon16.png");
 
   function getHeadlineText(el) {
     const text = (el.innerText || el.textContent || "").trim();
@@ -55,10 +58,13 @@
     const pill = document.createElement("span");
     pill.className = "kalshi-odds-pill kalshi-pill-fetching";
     pill.textContent = "Market odds";
+    pill.setAttribute("role", "button");
+    pill.tabIndex = 0;
+    pill.setAttribute("aria-live", "polite");
     return pill;
   }
 
-  function updatePill(pill, headline, markets) {
+  function updatePill(pill, headline, markets, isError = false) {
     // preserve last successful markets so the pill doesn't vanish on transient misses
     if (markets && markets.length) {
       headlineMarkets.set(headline, markets);
@@ -66,10 +72,16 @@
     const data = headlineMarkets.get(headline);
 
     pill.className = "kalshi-odds-pill";
+    pill.removeAttribute("aria-disabled");
 
     if (!data || !data.length) {
-      pill.style.display = "none";
+      pill.style.display = "inline-flex";
+      pill.classList.add(isError ? "kalshi-pill-error" : "kalshi-pill-empty");
+      pill.textContent = isError ? "Kalshi unavailable" : "No market yet";
+      pill.title = isError ? "Unable to reach Kalshi right now" : "No matching market found yet";
       pill.onclick = null;
+      pill.onkeydown = null;
+      pill.setAttribute("aria-disabled", "true");
       return;
     }
 
@@ -79,10 +91,17 @@
     pill.title = "View Kalshi market odds";
     pill._marketData = data;
     pill._card = null; // force rebuild if data changed
-    pill.onclick = (e) => {
+    const openCard = (e) => {
       e.preventDefault();
       e.stopPropagation();
       toggleCard(pill, data, headline);
+    };
+    pill.onclick = openCard;
+    pill.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openCard(e);
+      }
     };
   }
 
@@ -123,6 +142,11 @@
     card.style.left = `${left}px`;
 
     makeDraggable(card, card.querySelector(".kalshi-card-header"));
+    trapFocus(card);
+    const closeBtn = card.querySelector(".kalshi-card-close");
+    if (closeBtn) {
+      closeBtn.focus({ preventScroll: true });
+    }
 
     activeCard = card;
   }
@@ -147,7 +171,7 @@
         <span class="kalshi-card-index"></span>
         <button class="kalshi-nav-btn kalshi-nav-next" aria-label="Next market">›</button>
       </div>` : ""}
-      <a class="kalshi-cta" href="${normalizeKalshiUrl(marketData[0].url, marketData[0].ticker)}" target="_blank" rel="noopener">View market</a>
+      <a class="kalshi-cta" href="${normalizeKalshiUrl(marketData[0].url, marketData[0].ticker, marketData[0].series_ticker || marketData[0].event_ticker)}" target="_blank" rel="noopener">View market</a>
       <div class="kalshi-powered">Powered by <span>Kalshi</span></div>
     `;
     // defensive: ensure no pills render inside card
@@ -157,6 +181,13 @@
       e.stopPropagation();
       card.remove();
       activeCard = null;
+    });
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        card.remove();
+        activeCard = null;
+      }
     });
 
     const cardBody = card.querySelector(".kalshi-card-body");
@@ -176,8 +207,11 @@
         ? new Date(m.close_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "—";
 
-      const targetUrl = normalizeKalshiUrl(m.url, m.ticker);
-
+      const targetUrl = normalizeKalshiUrl(
+        m.url,
+        m.ticker,
+        m.series_ticker || m.event_ticker || m.series
+      );
       cardBody.innerHTML = `
         <div class="kalshi-market-item">
           <div class="kalshi-market-title">${escapeHtml(m.title)}</div>
@@ -228,6 +262,17 @@
           renderMarket(current);
         }
       });
+      const keyNav = (e) => {
+        if (e.key === "ArrowLeft" && current > 0) {
+          current -= 1;
+          renderMarket(current);
+        } else if (e.key === "ArrowRight" && current < marketData.length - 1) {
+          current += 1;
+          renderMarket(current);
+        }
+      };
+      prevBtn.addEventListener("keydown", keyNav);
+      nextBtn.addEventListener("keydown", keyNav);
     }
 
     renderMarket(current);
@@ -273,21 +318,35 @@
     return div.innerHTML;
   }
 
+  function pruneRemovedPills() {
+    for (const [headline, pill] of headlinePills.entries()) {
+      const host = headlineHosts.get(headline) || pill.parentElement;
+      if (!host || !host.isConnected || !document.contains(host)) {
+        pill.remove();
+        headlinePills.delete(headline);
+        headlineMarkets.delete(headline);
+        headlineHosts.delete(headline);
+      }
+    }
+  }
+
   function ensurePills(headlineMap) {
     for (const [headline, el] of headlineMap.entries()) {
       if (headlinePills.has(headline)) continue;
       const pill = createFetchingPill();
       el.style.position = "relative";
       el.appendChild(pill);
+      pill._host = el;
       headlinePills.set(headline, pill);
+      headlineHosts.set(headline, el);
       processedElements.add(el); // prevent duplicate pills on rescans
     }
   }
 
-  function injectResults(results) {
+  function injectResults(results, isError = false) {
     for (const [headline, pill] of headlinePills.entries()) {
       const markets = results && results[headline];
-      updatePill(pill, headline, markets);
+      updatePill(pill, headline, markets, isError);
     }
   }
 
@@ -296,16 +355,26 @@
     if (!headlines.length) return;
 
     ensurePills(headlineMap);
+    pruneRemovedPills();
 
     chrome.runtime.sendMessage({ type: "MATCH_HEADLINES", headlines }, (response) => {
       if (chrome.runtime.lastError) {
         console.warn("Kalshi extension:", chrome.runtime.lastError.message);
+        injectResults({}, true); // clear fetching state on error so pills don't hang
         return;
       }
       if (response && response.ok && response.results) {
         injectResults(response.results);
+        const now = Date.now();
+        if (now - lastLogTs > 10000) {
+          const hitCount = Object.keys(response.results || {}).length;
+          console.log(
+            `Kalshi extension: matched ${hitCount} headlines; markets ${response.marketCount || "?"} via ${response.api || "?"}`
+          );
+          lastLogTs = now;
+        }
       } else {
-        injectResults({});
+        injectResults({}, true);
       }
     });
   }
@@ -332,9 +401,40 @@
 })();
 
 // Normalize a Kalshi market URL defensively (used by content and background responses)
-function normalizeKalshiUrl(url, ticker) {
+function normalizeKalshiUrl(url, ticker, seriesTicker) {
   if (url && url.startsWith("http")) return url;
   if (url && url.startsWith("/")) return `https://kalshi.com${url}`;
-  if (ticker) return `https://kalshi.com/markets/${ticker}`;
+  if (url && url.includes("/")) return `https://kalshi.com/markets/${url}`;
+
+  // Kalshi uses /markets/{series_ticker} — single segment, redirects to full SEO URL
+  const eventSlug = (seriesTicker || "").toString();
+  const tickerSlug = (ticker || "").toString();
+
+  if (eventSlug) return `https://kalshi.com/markets/${eventSlug}`;
+  if (tickerSlug) return `https://kalshi.com/markets/${tickerSlug}`;
   return "https://kalshi.com/markets";
+}
+
+function trapFocus(container) {
+  const focusable = Array.from(
+    container.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])')
+  ).filter((el) => !el.hasAttribute("disabled"));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  container.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 }

@@ -439,6 +439,20 @@
   border-color: rgba(0, 198, 94, 0.3);
   box-shadow: none;
 }
+.kalshi-pill-empty {
+  background: #f0f4f1;
+  color: #3d4b43;
+  border-color: #d2d8d4;
+  box-shadow: none;
+  cursor: default;
+}
+.kalshi-pill-error {
+  background: #2f1515;
+  color: #ffb1b1;
+  border-color: #ff6b6b;
+  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.25);
+  cursor: default;
+}
 
 .kalshi-market-card {
   width: min(280px, 90vw);
@@ -657,6 +671,14 @@
 .kalshi-powered span {
   color: #00e38f;
   font-weight: 700;
+}
+.kalshi-odds-pill:focus-visible,
+.kalshi-nav-btn:focus-visible,
+.kalshi-card-close:focus-visible,
+.kalshi-cta:focus-visible,
+.kalshi-odd:focus-visible {
+  outline: 2px solid #00e38f;
+  outline-offset: 2px;
 }
 /* CTA Link */
 .ho-link {

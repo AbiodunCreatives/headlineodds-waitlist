@@ -11,8 +11,32 @@ const FETCH_TIMEOUT_MS = 10000;
 
 let marketsCache = { data: [], ts: 0, api: null };
 
+// Keep the MV3 service worker alive so content scripts can always reach it
+chrome.alarms.create("keepalive", { periodInMinutes: 0.4 });
+chrome.alarms.onAlarm.addListener(() => {}); // wakes the SW on each tick
+
 function log(...args) {
   console.log("[Kalshi BG]", ...args);
+}
+
+function buildMarketUrl(market) {
+  const direct = market.market_url || market.url || market.public_url || market.url_slug;
+  if (direct) {
+    if (direct.startsWith("http")) return direct;
+    if (direct.startsWith("/")) return `https://kalshi.com${direct}`;
+    return `https://kalshi.com/markets/${direct}`;
+  }
+
+  // Kalshi URLs are single-segment: /markets/{series_ticker} redirects correctly.
+  // event_ticker (e.g. KXWITHDRAW-29) and market ticker 404; series_ticker (e.g. KXWITHDRAW) works.
+  const seriesTicker = (market.series_ticker || "").toString();
+  const eventTicker = (market.event_ticker || "").toString();
+  const ticker = (market.ticker || "").toString();
+
+  if (seriesTicker) return `https://kalshi.com/markets/${seriesTicker}`;
+  if (eventTicker) return `https://kalshi.com/markets/${eventTicker}`;
+  if (ticker) return `https://kalshi.com/markets/${ticker}`;
+  return "https://kalshi.com/markets";
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -49,52 +73,73 @@ async function getAllMarkets() {
   let activeApi = null;
 
   for (const apiBase of KALSHI_APIS) {
-    allMarkets = [];
-    let cursor = null;
+    try {
+      allMarkets = [];
+      let cursor = null;
 
-    for (let i = 0; i < MAX_EVENT_PAGES; i++) {
-      const result = await fetchEvents(apiBase, cursor);
-      const events = result.events || [];
+      for (let i = 0; i < MAX_EVENT_PAGES; i++) {
+        const result = await fetchEvents(apiBase, cursor);
+        const events = result.events || [];
 
-      for (const event of events) {
-        const category = event.category || "";
-        const eventTitle = event.title || "";
-        const markets = event.markets || [];
+        for (const event of events) {
+          const category = event.category || "";
+          const eventTitle = event.title || "";
+          const markets = event.markets || [];
+          const seriesTicker = event.series_ticker || event.event_ticker || "";
 
-        for (const m of markets) {
-          if (m.ticker && seenTickers.has(m.ticker)) continue;
-          if (m.ticker) seenTickers.add(m.ticker);
+          for (const m of markets) {
+            if (m.ticker && seenTickers.has(m.ticker)) continue;
+            if (m.ticker) seenTickers.add(m.ticker);
 
-          const close = m.close_time || m.expected_expiration_time;
-          if (close && new Date(close).getTime() < Date.now()) continue;
+            const close = m.close_time || m.expected_expiration_time;
+            if (close && new Date(close).getTime() < Date.now()) continue;
 
-          allMarkets.push({
-            ticker: m.ticker,
-            title: m.title || eventTitle,
-            subtitle: m.subtitle || event.sub_title || "",
-            category,
-            event_title: eventTitle,
-            yes_bid: m.yes_bid,
-            no_bid: m.no_bid,
-            yes_ask: m.yes_ask,
-            no_ask: m.no_ask,
-            last_price: m.last_price,
-            volume: m.volume,
-            open_interest: m.open_interest,
-            close_time: close,
-            market_url: m.market_url || m.url || m.public_url || m.url_slug,
-          });
+            allMarkets.push({
+              ticker: m.ticker,
+              series_ticker: seriesTicker || m.series_ticker,
+              event_ticker: m.event_ticker,
+              title: m.title || eventTitle,
+              subtitle: m.subtitle || event.sub_title || "",
+              category,
+              event_title: eventTitle,
+              yes_bid: m.yes_bid,
+              no_bid: m.no_bid,
+              yes_ask: m.yes_ask,
+              no_ask: m.no_ask,
+              last_price: m.last_price,
+              volume: m.volume,
+              open_interest: m.open_interest,
+              close_time: close,
+              market_url: m.market_url || m.url || m.public_url || m.url_slug,
+              url_slug: m.url_slug,
+              // fallback URL built now so the content script can use it directly
+              computed_url: buildMarketUrl({
+                market_url: m.market_url || m.url || m.public_url || m.url_slug,
+                ticker: m.ticker,
+                series_ticker: seriesTicker || m.series_ticker,
+                event_ticker: m.event_ticker,
+                url_slug: m.url_slug,
+              }),
+            });
+          }
         }
+
+        cursor = result.cursor;
+        if (!cursor || events.length < EVENTS_PAGE_LIMIT) break;
       }
 
-      cursor = result.cursor;
-      if (!cursor || events.length < EVENTS_PAGE_LIMIT) break;
+      if (allMarkets.length > 0) {
+        activeApi = apiBase;
+        break;
+      }
+    } catch (err) {
+      log(`API ${apiBase} failed, trying next:`, err.message || err);
+      continue;
     }
+  }
 
-    if (allMarkets.length > 0) {
-      activeApi = apiBase;
-      break;
-    }
+  if (!allMarkets.length || !activeApi) {
+    throw new Error("No markets retrieved from any Kalshi API");
   }
 
   marketsCache = { data: allMarkets, ts: Date.now(), api: activeApi };
@@ -185,6 +230,8 @@ function findMatches(headline, markets) {
 
   return scored.map((s) => ({
     ticker: s.market.ticker,
+    series_ticker: s.market.series_ticker,
+    event_ticker: s.market.event_ticker,
     title: s.market.title,
     subtitle: s.market.subtitle || "",
     category: s.market.category,
@@ -194,9 +241,7 @@ function findMatches(headline, markets) {
     volume: s.market.volume,
     open_interest: s.market.open_interest,
     close_time: s.market.close_time,
-    url:
-      s.market.market_url ||
-      (s.market.ticker ? `https://kalshi.com/markets/${s.market.ticker}` : ""),
+    url: s.market.computed_url || buildMarketUrl(s.market),
     score: s.score,
   }));
 }

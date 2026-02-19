@@ -3,10 +3,11 @@
   "name": "Headline Odds",
   "version": "1.0.0",
   "description": "Shows real-time Kalshi prediction market odds next to news headlines",
-  "permissions": ["storage"],
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://api.elections.kalshi.com/*",
-    "https://api.kalshi.com/*"
+    "https://api.kalshi.com/*",
+    "https://kalshi.com/*"
   ],
   "background": {
     "service_worker": "background.js"
