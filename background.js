@@ -11,6 +11,17 @@ const FETCH_TIMEOUT_MS = 10000;
 
 let marketsCache = { data: [], ts: 0, api: null };
 
+// ---------------------------------------------------------------------------
+// AI semantic matching via Cloudflare Workers AI (bge-small-en-v1.5, 384-dim)
+// Set EMBED_API_URL to your deployed Worker URL to enable vector matching.
+// Leave as null to use keyword + cluster matching only (still works great).
+// ---------------------------------------------------------------------------
+const EMBED_API_URL = null; // "https://headline-embed.YOUR-NAME.workers.dev"
+
+let marketEmbeddings = new Map(); // ticker → Float32Array
+let headlineEmbeddings = new Map(); // headline text → Float32Array
+let embeddingCacheTs = 0; // tracks which marketsCache batch has been embedded
+
 // Keep the MV3 service worker alive so content scripts can always reach it
 chrome.alarms.create("keepalive", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -146,6 +157,10 @@ async function getAllMarkets() {
 
   marketsCache = { data: allMarkets, ts: Date.now(), api: activeApi };
   log(`Cached ${allMarkets.length} markets from ${activeApi || "unknown"}`);
+
+  // Non-blocking: embed market titles in background for semantic matching
+  embedMarketsAsync(allMarkets);
+
   return allMarkets;
 }
 
@@ -258,6 +273,72 @@ const SEMANTIC_CLUSTERS = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Vector embedding helpers
+// ---------------------------------------------------------------------------
+
+function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+async function fetchEmbeddings(texts) {
+  if (!EMBED_API_URL || texts.length === 0) return null;
+  try {
+    const res = await fetchWithTimeout(
+      EMBED_API_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts }),
+      },
+      8000
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.embeddings || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Embeds all market titles via the CF Worker and stores vectors in
+ * `marketEmbeddings`. Called non-blocking after markets are fetched.
+ */
+async function embedMarketsAsync(markets) {
+  if (!EMBED_API_URL) return;
+  if (embeddingCacheTs === marketsCache.ts) return; // already done for this batch
+
+  log(`Embedding ${markets.length} markets via CF Worker...`);
+  const BATCH = 50;
+  const newEmbeddings = new Map();
+
+  for (let i = 0; i < markets.length; i += BATCH) {
+    const slice = markets.slice(i, i + BATCH);
+    const texts = slice.map((m) =>
+      [m.title, m.subtitle, m.event_title].filter(Boolean).join(" ").slice(0, 256)
+    );
+    const vecs = await fetchEmbeddings(texts);
+    if (!vecs) { log("Embedding batch failed — stopping"); break; }
+    slice.forEach((m, j) => {
+      if (vecs[j]) newEmbeddings.set(m.ticker, new Float32Array(vecs[j]));
+    });
+  }
+
+  if (newEmbeddings.size > 0) {
+    marketEmbeddings = newEmbeddings;
+    embeddingCacheTs = marketsCache.ts;
+    log(`Stored ${newEmbeddings.size} market embeddings`);
+  }
+}
+
 /** Return the set of cluster IDs that the given text belongs to. */
 function getClusters(text) {
   const lower = text.toLowerCase();
@@ -301,7 +382,7 @@ function extractKeywords(text) {
     .filter((w) => w.length > 2 && !stopWords.has(w));
 }
 
-function scoreMatch(headlineKw, headlineClusters, market) {
+function scoreMatch(headlineKw, headlineClusters, headlineVec, market) {
   const marketText = [
     market.title,
     market.subtitle,
@@ -356,18 +437,29 @@ function scoreMatch(headlineKw, headlineClusters, market) {
     if (hours > 0 && hours < 24 * 7) recency = 0.2;
   }
 
-  return matches / headlineKw.length + bonus + bigramBonus + clusterBonus + recency;
+  // Vector semantic bonus: cosine similarity between headline and market embeddings.
+  // Only applied when embeddings are available (EMBED_API_URL is set).
+  // Similarity must exceed 0.5 to avoid noise from weakly-related topics.
+  let semanticBonus = 0;
+  const marketVec = marketEmbeddings.get(market.ticker);
+  if (headlineVec && marketVec) {
+    const sim = cosineSimilarity(headlineVec, marketVec);
+    if (sim > 0.5) semanticBonus = (sim - 0.5) * 1.0; // 0–0.45 range
+  }
+
+  return matches / headlineKw.length + bonus + bigramBonus + clusterBonus + recency + semanticBonus;
 }
 
 function findMatches(headline, markets) {
   const headlineKw = extractKeywords(headline);
   const headlineClusters = getClusters(headline);
+  const headlineVec = headlineEmbeddings.get(headline) || null;
 
   // Need at least one keyword or one cluster match to be worth scoring
   if (headlineKw.length < 1 && headlineClusters.size === 0) return [];
 
   const scored = markets
-    .map((m) => ({ market: m, score: scoreMatch(headlineKw, headlineClusters, m) }))
+    .map((m) => ({ market: m, score: scoreMatch(headlineKw, headlineClusters, headlineVec, m) }))
     .filter((s) => s.score > 0.15)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
@@ -401,13 +493,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type !== "MATCH_HEADLINES") return;
 
   getAllMarkets()
-    .then((markets) => {
+    .then(async (markets) => {
+      // Batch-embed all headlines that aren't cached yet (one round-trip to CF Worker)
+      if (EMBED_API_URL) {
+        const toEmbed = [...new Set(msg.headlines)].filter(
+          (h) => !headlineEmbeddings.has(h)
+        );
+        if (toEmbed.length > 0) {
+          const vecs = await fetchEmbeddings(toEmbed);
+          if (vecs) {
+            toEmbed.forEach((h, i) => {
+              if (vecs[i]) headlineEmbeddings.set(h, new Float32Array(vecs[i]));
+            });
+          }
+        }
+      }
+
       const results = {};
       for (const headline of msg.headlines) {
         const matches = findMatches(headline, markets);
-        if (matches.length) {
-          results[headline] = matches;
-        }
+        if (matches.length) results[headline] = matches;
       }
       sendResponse({ ok: true, results, marketCount: markets.length, api: marketsCache.api });
     })
