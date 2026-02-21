@@ -99,6 +99,74 @@
   50%       { opacity: 0.9; }
 }
 
+/* ── Divergence pill (amber) ──────────────────────────────── */
+.kalshi-pill-diverge {
+  border-color: rgba(255, 176, 0, 0.52);
+  background: rgba(28, 16, 0, 0.92);
+  box-shadow: 0 0 0 3px rgba(255, 176, 0, 0.07);
+  animation: kalshi-diverge-pulse 2.8s ease-in-out infinite;
+}
+
+.kalshi-pill-diverge:hover {
+  border-color: rgba(255, 176, 0, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 176, 0, 0.16), 0 2px 14px rgba(255, 176, 0, 0.22);
+}
+
+@keyframes kalshi-diverge-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255, 176, 0, 0.06); border-color: rgba(255, 176, 0, 0.5); }
+  50%       { box-shadow: 0 0 0 3px rgba(255, 176, 0, 0.18), 0 0 12px rgba(255, 176, 0, 0.2); border-color: rgba(255, 176, 0, 0.82); }
+}
+
+.kalshi-pill-diverge .kalshi-pill-yes { color: #ffb800; }
+
+.kalshi-pill-diverge-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ── Divergence banner inside card ───────────────────────── */
+.kalshi-diverge-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: rgba(255, 176, 0, 0.08);
+  border: 1px solid rgba(255, 176, 0, 0.28);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffcc44;
+  letter-spacing: 0.01em;
+}
+
+/* ── Share to X button ────────────────────────────────────── */
+.kalshi-share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(29, 155, 240, 0.08);
+  border: 1px solid rgba(29, 155, 240, 0.22);
+  color: #1d9bf0;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;
+  cursor: pointer;
+}
+
+.kalshi-share-btn:hover {
+  background: rgba(29, 155, 240, 0.16);
+  border-color: rgba(29, 155, 240, 0.5);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
 .kalshi-pill-empty {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(30, 30, 30, 0.6);
@@ -366,6 +434,7 @@
   }
   .kalshi-pill-live,
   .kalshi-pill-fetching,
+  .kalshi-pill-diverge,
   .kalshi-slide {
     animation: none !important;
   }

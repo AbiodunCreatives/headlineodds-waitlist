@@ -20,6 +20,24 @@
 
   const MIN_HEADLINE_LEN = 20;
   const MAX_HEADLINE_LEN = 300;
+
+  // ── Divergence detection ───────────────────────────────────
+  const CONFIDENT_PHRASES = [
+    "set to ", "will ", "confirms", "confirmed", "signals", "expected to",
+    "poised to", "on track", "heading for", "secures", "seals", "clinches",
+    "approved", "approves", "passes ", "passed ", "to sign", "has signed",
+    "launches", "announces", "announced", "officially", "prepares to",
+    "is set", "guaranteed", "certain to", "mandates", "bans ", "wins ",
+    "defeats", "rejects", "sealed", "locked in", "green-lights",
+  ];
+  const DIVERGE_THRESHOLD = 40; // yes_bid < 40¢ = divergent
+
+  function isDivergent(headline, yesPrice) {
+    if (yesPrice == null) return false;
+    if (yesPrice >= DIVERGE_THRESHOLD) return false;
+    const lower = headline.toLowerCase();
+    return CONFIDENT_PHRASES.some(p => lower.includes(p));
+  }
   const processedElements = new WeakSet();
   const headlinePills = new Map(); // headline -> pill
   const headlineMarkets = new Map(); // headline -> last good markets
@@ -89,10 +107,19 @@
     const topMarket = data[0];
     const yesPrice = topMarket.yes_bid != null ? topMarket.yes_bid : topMarket.last_price;
     const yesLabel = yesPrice != null ? `${yesPrice}¢` : "—";
-    pill.innerHTML = `<span class="kalshi-pill-live" aria-hidden="true"></span><span class="kalshi-pill-yes">${yesLabel}</span><span class="kalshi-pill-label">yes</span>`;
-    pill.title = `Yes: ${yesLabel} · Click to see market odds`;
+    const divergent = isDivergent(headline, yesPrice);
+    pill._divergent = divergent;
     pill._marketData = data;
     pill._card = null; // force rebuild if data changed
+
+    if (divergent) {
+      pill.classList.add("kalshi-pill-diverge");
+      pill.innerHTML = `<span class="kalshi-pill-diverge-icon" aria-hidden="true">⚡</span><span class="kalshi-pill-yes">${yesLabel}</span><span class="kalshi-pill-label">yes</span>`;
+      pill.title = `⚡ Market disagrees · Yes: ${yesLabel} · Click to see`;
+    } else {
+      pill.innerHTML = `<span class="kalshi-pill-live" aria-hidden="true"></span><span class="kalshi-pill-yes">${yesLabel}</span><span class="kalshi-pill-label">yes</span>`;
+      pill.title = `Yes: ${yesLabel} · Click to see market odds`;
+    }
     const openCard = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -158,6 +185,7 @@
     card.className = "kalshi-market-card";
     card._pill = pill;
 
+    const divergent = pill._divergent;
     card.innerHTML = `
       <div class="kalshi-card-header">
         <div class="kalshi-card-title">
@@ -166,6 +194,7 @@
         </div>
         <button class="kalshi-card-close" aria-label="Close">✕</button>
       </div>
+      ${divergent ? `<div class="kalshi-diverge-banner"><span>⚡</span><span>Market disagrees with this headline</span></div>` : ""}
       <div class="kalshi-card-body"></div>
       ${marketData.length > 1 ? `
       <div class="kalshi-card-nav">
@@ -174,6 +203,7 @@
         <button class="kalshi-nav-btn kalshi-nav-next" aria-label="Next market">›</button>
       </div>` : ""}
       <a class="kalshi-cta" href="${normalizeKalshiUrl(marketData[0].url, marketData[0].ticker, marketData[0].series_ticker || marketData[0].event_ticker)}" target="_blank" rel="noopener">View market</a>
+      <a class="kalshi-share-btn" href="#" target="_blank" rel="noopener">𝕏 Share these odds</a>
       <div class="kalshi-powered">Powered by <span>Kalshi</span></div>
     `;
     const logoImg = card.querySelector(".kalshi-card-logo-img");
@@ -248,6 +278,14 @@
 
       const cta = card.querySelector(".kalshi-cta");
       if (cta) cta.href = targetUrl;
+
+      const shareBtn = card.querySelector(".kalshi-share-btn");
+      if (shareBtn) {
+        const shortHeadline = headline.length > 110 ? headline.slice(0, 107) + "…" : headline;
+        const tweetText = `"${shortHeadline}"\n\nMarket says: ${yesPct} yes\n\nvia @headlineodds 🟢\nheadlineodds.fun`;
+        shareBtn.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+      }
+
       if (indexEl) indexEl.textContent = `${idx + 1}/${marketData.length}`;
       if (prevBtn) prevBtn.disabled = idx === 0;
       if (nextBtn) nextBtn.disabled = idx === marketData.length - 1;
